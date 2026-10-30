@@ -413,6 +413,8 @@ function calc(b,cfg){
   const rows=g=>(b[g]||[]).filter(l=>l.on&&l.k!=='ret').map(l=>({l,amt:lineAmount(l,b,cfg)}));
   const sum=a=>a.reduce((s,r)=>s+r.amt,0);
   const reem=rows('reembolso'),gas=rows('gastos'),hon=rows('honorarios');
+  const all=g=>(b[g]||[]).filter(l=>l.k!=='ret').map(l=>({l,on:!!l.on,amt:l.on?lineAmount(l,b,cfg):0}));
+  const reemAll=all('reembolso'),gasAll=all('gastos');
   const tReem=sum(reem),tGas=sum(gas),tHon=sum(hon);
   const d=b.descuento||{mode:'monto',val:0};
   let desc=d.mode==='pct'?Math.round(tHon*(Number(d.val)||0)/100):Math.round(Number(d.val)||0);
@@ -424,7 +426,7 @@ function calc(b,cfg){
   const saldo=total-pagado;
   const rt=b.ret&&b.ret.on?(b.ret.mode==='monto'?Math.round(Number(b.ret.val)||0):Math.round(valorGs(b)*(Number(b.ret.val)||0)/100)):0;
   const estado=total>0&&pagado>=total?'Pagado':pagado>0?'Parcial':'Pendiente';
-  return {ret:rt,totalConRet:total+rt,reem,gas,hon,tReem,tGas,tHon,desc,tServ,iva10,total,pagado,saldo,senaAmt,estado,pct:total>0?Math.min(100,pagado/total*100):0};
+  return {ret:rt,totalConRet:total+rt,reemAll,gasAll,reem,gas,hon,tReem,tGas,tHon,desc,tServ,iva10,total,pagado,saldo,senaAmt,estado,pct:total>0?Math.min(100,pagado/total*100):0};
 }
 
 const RE=[['tj','Tasa judicial'],['tjh','Tasa judicial sobre hipoteca / prenda'],['imv','Impuesto municipal (venta)'],['imh','Impuesto municipal (hipoteca)'],['te','Tasas especiales'],['opaci','Formulario OPACI'],['abog','Abogacía y publicación'],['verif','Verificación'],['plano','Aprobación de planos y otros']];
@@ -826,13 +828,13 @@ function sheetsHTML(b,c,cfg){
   const k=calc(b,cfg),total=b.hoja2?2:1,cls='sheet t-'+(b.tipo==='juicio'?'juicio':'escribania');
   const row=(label,a1,a3,extra)=>`<tr${extra?` class="${extra}"`:''}><td class="ind">${label}</td><td class="n">${a1}</td><td class="n">${a3}</td></tr>`;
   let t=`<tr class="sec"><td colspan="3">1) Reembolso de impuestos / tasas y gastos</td></tr>`;
-  k.reem.forEach(r=>t+=row(esc(lineLabel(r.l)),fmt(r.amt),''));
+  k.reemAll.forEach(r=>t+=row(esc(r.on?lineLabel(r.l):r.l.label),r.on?fmt(r.amt):'–',''));
   t+=row('<b>Total</b>',`<b>${fmt(k.tReem)}</b>`,'','sub');
   t+=`<tr class="sec"><td colspan="3">2) Gastos</td></tr>`;
-  k.gas.forEach(r=>t+=row(esc(lineLabel(r.l)),'',fmt(r.amt)));
+  k.gasAll.forEach(r=>t+=row(esc(r.on?lineLabel(r.l):r.l.label),'',r.on?fmt(r.amt):'–'));
   t+=`<tr class="sec"><td colspan="3">3) Honorarios profesionales</td></tr>`;
   t+=row('Honorarios profesionales'+(b.hoja2?' <span class="mu">(detalle en hoja 2)</span>':''),'',fmt(k.tHon));
-  if(k.desc)t+=`<tr class="sec"><td colspan="3">4) Otros</td></tr>`+row('Descuento sobre honorarios','',fmt(-k.desc),'neg');
+  t+=`<tr class="sec"><td colspan="3">4) Otros</td></tr>`+row('Descuento sobre honorarios','',k.desc?fmt(-k.desc):'–',k.desc?'neg':'');
   t+=row('<b>Subtotal</b>',`<b>${fmt(k.tReem)}</b>`,`<b>${fmt(k.tServ)}</b>`,'sub');
   const cond=[];
   if([...b.gastos,...b.honorarios].some(l=>l.on&&l.mode==='esc'))cond.push(b.dist==='mas'?'Más de 150 km':'Hasta 150 km');
@@ -951,10 +953,10 @@ async function exportXLSX(){
     const a=[[b.tipo==='juicio'?m.juicio:m.escribania,'','',`PRESUPUESTO N° ${pad(b.nro)}`],[ 'Digital Law Office','','',fechaTxt(b.fecha)],[],
       ['CLIENTE:',c&&c.nombre||'','C.I./RUC:',c&&c.doc||''],['CONCEPTO:',b.concepto],['CONDICIONES:',(descActive(b)?'Con descuento':'Sin descuento')+' · '+(b.dist==='mas'?'Más de 150 km':'Hasta 150 km')],['VALOR (Gs.):',valorGs(b)],...(b.moneda==='USD'?[['VALOR EN USD:',b.valor||0],['CAMBIO (Gs. POR USD):',b.tc||0]]:[]),[],
       ['1) REEMBOLSO DE IMPUESTOS / TASAS Y GASTOS','Imp./Tasas/Gastos','Servicios I.V.A. 10%']];
-    k.reem.forEach(r=>a.push([lineLabel(r.l),r.amt,'']));a.push(['TOTAL',k.tReem,'']);
-    a.push(['2) GASTOS','','']);k.gas.forEach(r=>a.push([lineLabel(r.l),'',r.amt]));
+    k.reemAll.forEach(r=>a.push([r.on?lineLabel(r.l):r.l.label,r.on?r.amt:'–','']));a.push(['TOTAL',k.tReem,'']);
+    a.push(['2) GASTOS','','']);k.gasAll.forEach(r=>a.push([r.on?lineLabel(r.l):r.l.label,'',r.on?r.amt:'–']));
     a.push(['3) HONORARIOS PROFESIONALES','',k.tHon]);
-    if(k.desc)a.push(['4) DESCUENTO S/ HONORARIOS','',-k.desc]);
+    a.push(['4) OTROS · DESCUENTO S/ HONORARIOS','',k.desc?-k.desc:'–']);
     a.push(['SUB-TOTAL',k.tReem,k.tServ],[],['LIQUIDACIÓN I.V.A. 5%',0],['LIQUIDACIÓN I.V.A. 10%',k.iva10],['TOTAL I.V.A.',k.iva10],
       ['TOTAL REEMBOLSO DE IMPUESTOS / TASAS',k.tReem],['TOTAL VENTAS / SERVICIOS',k.tServ],['TOTAL A PAGAR',k.total]);
     if(k.ret)a.push(['RETENCIÓN (APARTE DEL TOTAL)',k.ret],['TOTAL CON RETENCIÓN',k.totalConRet]);
