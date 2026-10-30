@@ -57,6 +57,11 @@ button{cursor:pointer}
 .top h1{font:900 17px/1.1 var(--f-display);margin:0;letter-spacing:.2px}
 .top .sp{flex:1}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:600;border:1px solid var(--line);background:var(--panel);color:var(--mute);white-space:nowrap}
+.atbl{width:100%;border-collapse:collapse;font-size:14px}.atbl th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}.atbl td{padding:9px 8px;border-bottom:1px solid var(--line2);vertical-align:middle}.atbl tr[data-act]{cursor:pointer}.atbl tr[data-act]:hover td{background:var(--panel)}.atbl .r{text-align:right;white-space:nowrap}
+.twrap{overflow-x:auto}.afil{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.afil .search{flex:1;min-width:200px}.asum{display:flex;gap:18px;flex-wrap:wrap;margin:4px 0 12px;font-size:13px;color:var(--mute)}.asum b{color:var(--ink)}
+.cmp{grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.cmp img{height:46px;border-radius:6px;border:1px solid var(--line);cursor:zoom-in}
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.82);display:grid;place-items:center;z-index:300;cursor:zoom-out;padding:16px}#lightbox img{max-width:96vw;max-height:92vh;border-radius:8px;background:#fff}
+.atbl tr.hl td{background:var(--ok-bg)}.tpl.sel{outline:2px solid var(--olive);outline-offset:-1px}.tplgrid .tpl.sel b{color:var(--olive-ink)}
 .pill.ok{color:var(--ok);background:var(--ok-bg);border-color:transparent}
 .pill.warn{color:var(--warn);background:var(--warn-bg);border-color:transparent}
 .pill.bad{color:var(--bad);background:var(--bad-bg);border-color:transparent}
@@ -269,6 +274,8 @@ textarea.in{resize:vertical;min-height:58px}
     <span class="pill" id="areapill" hidden></span>
     <button class="btn" id="btnHome" type="button" hidden>Cambiar de área</button>
     <span class="pill" id="savepill">Cargando…</span>
+    <button class="btn pri" id="btnNewB" type="button">＋ Nuevo presupuesto</button>
+    <button class="btn" id="btnAll" type="button">Presupuestos y clientes</button>
     <button class="btn" id="btnCfg" type="button">Tarifas y membrete</button>
     <button class="btn" id="btnOut" type="button">Salir</button>
   </header>
@@ -600,13 +607,86 @@ function renderHome(){
 function renderAll(){
   $('#shell').classList.toggle('home',!S.area);
   applyArea();renderTop();
-  if(!S.area){if(S.view==='cfg')renderConfig();else renderHome();$('#side').innerHTML='';saveUi();return}
+  if(!S.area){if(S.view==='cfg')renderConfig();else if(S.view==='all')renderAllView();else if(S.view==='newb')renderNewBudget();else renderHome();$('#side').innerHTML='';saveUi();return}
   renderSide();
   if(S.view==='cfg')renderConfig();else renderMain();
   saveUi();
 }
 function tplCard(t){return `<button class="tpl" type="button" data-act="newb" data-id="${t.id}"><span class="k ${t.tipo==='juicio'?'j':'e'}">${t.tipo==='juicio'?'Juicio':'Escribanía'}</span><b>${esc(t.nombre)}</b><small>${esc(t.desc)}</small></button>`}
+S.draftB=null;S.hl=null;
+function freshDraftB(){const a=S.area||'escribania';return{area:a,tpl:(TEMPLATES.find(t=>t.tipo===a&&!/blanco/.test(t.id))||{}).id,nombre:'',doc:'',tel:'',valor:0}}
+function renderNewBudget(){
+  if(!S.draftB)S.draftB=freshDraftB();const d=S.draftB,m=$('#main');m.style.cssText='';
+  const sel=S.clientes.find(c=>(c.nombre||'').trim().toLowerCase()===d.nombre.trim().toLowerCase()&&d.nombre.trim());
+  m.innerHTML=`<section class="card"><form id="nbform" autocomplete="off"><div class="card-h"><h3>Nuevo presupuesto</h3></div>
+   <div class="afil"><button class="btn sm ${d.area==='escribania'?'pri':''}" type="button" data-act="narea" data-v="escribania">Escribanía</button><button class="btn sm ${d.area==='juicio'?'pri':''}" type="button" data-act="narea" data-v="juicio">Judicial</button></div>
+   <div class="grid2"><label class="fld" style="grid-column:1/-1"><span>Cliente (escribí el nombre; si ya existe se usa ese)</span><input class="in big" id="nb-nombre" list="nb-list" value="${esc(d.nombre)}" placeholder="Nombre y apellido"><datalist id="nb-list">${sortedClients().map(c=>`<option value="${esc(c.nombre)}">`).join('')}</datalist></label>
+   <div class="hint" id="nb-hint" style="grid-column:1/-1;margin-top:-6px">${sel?'Cliente existente: el presupuesto se agrega a su ficha.':(d.nombre.trim()?'Cliente nuevo: se crea al guardar.':'')}</div>
+   <label class="fld"><span>C.I. / RUC</span><input class="in" id="nb-doc" value="${esc(d.doc)}"></label>
+   <label class="fld"><span>Teléfono</span><input class="in" id="nb-tel" value="${esc(d.tel)}"></label>
+   <label class="fld"><span>Valor del acto (Gs.)</span><input class="in r num" id="nb-valor" inputmode="numeric" value="${d.valor?fmt(d.valor):''}" placeholder="0"></label></div>
+   <div class="fld" style="margin-top:10px"><span>Tipo de presupuesto</span></div>
+   <div class="tplgrid">${TEMPLATES.filter(t=>t.tipo===d.area).map(t=>`<button class="tpl ${t.id===d.tpl?'sel':''}" type="button" data-act="ntpl" data-id="${t.id}"><b>${esc(t.nombre)}</b><small>${esc(t.desc)}</small></button>`).join('')}</div>
+   <div class="addrow" style="margin-top:14px"><button class="btn pri" type="submit" value="list">Guardar presupuesto</button><button class="btn" type="submit" value="edit">Guardar y completar</button><button class="btn" type="button" data-act="cancelb">Cancelar</button></div></form></section>`;
+  const i=$('#nb-nombre');if(i&&!d.nombre)i.focus();
+}
+function saveNewBudget(mode){
+  const d=S.draftB;if(!d)return;if(!d.nombre.trim()){toast('Escribí el nombre del cliente');const i=$('#nb-nombre');if(i)i.focus();return}
+  if(!d.tpl){toast('Elegí el tipo de presupuesto');return}
+  let c=S.clientes.find(x=>(x.nombre||'').trim().toLowerCase()===d.nombre.trim().toLowerCase());
+  if(!c){c={id:uid(),nombre:d.nombre.trim(),doc:d.doc.trim(),tel:d.tel.trim(),nota:'',creado:Date.now()};S.clientes.push(c);queueSave('clientes',c)}
+  else{let ch=false;if(!c.doc&&d.doc.trim()){c.doc=d.doc.trim();ch=true}if(!c.tel&&d.tel.trim()){c.tel=d.tel.trim();ch=true}if(ch)queueSave('clientes',c)}
+  const b=makeBudget(d.tpl,S.cfg,{clienteId:c.id,nro:nextNro(),fecha:today(),valor:Number(d.valor)||0,creado:Date.now()});
+  S.budgets.push(b);saveBudget(b);S.draftB=null;S.hl=b.id;
+  if(mode==='edit'){S.area=b.tipo;S.selC=c.id;S.selB=b.id;S.view='main';S.tab='edit';S.picking=false;S.q='';renderAll();toast('Presupuesto guardado')}
+  else{S.view='all';S.allTab='p';S.allArea='';S.allEst='';S.aq='';renderAll();toast('Presupuesto guardado');setTimeout(()=>{const r=document.querySelector('#abody tr.hl');if(r&&r.scrollIntoView)r.scrollIntoView({block:'nearest'})},50)}
+}
+S.allTab='p';S.allArea='';S.allEst='';S.aq='';S.draftC={nombre:'',doc:'',tel:''};
+function renderNewClient(){
+  const m=$('#main');m.style.cssText='';const d=S.draftC;
+  m.innerHTML=`<section class="card"><form id="ncform" autocomplete="off"><div class="card-h"><h3>Nuevo cliente</h3></div>
+    <div class="grid2"><label class="fld" style="grid-column:1/-1"><span>Nombre y apellido</span><input class="in big" id="nc-nombre" value="${esc(d.nombre)}" placeholder="Nombre y apellido" autofocus></label>
+    <label class="fld"><span>C.I. / RUC</span><input class="in" id="nc-doc" value="${esc(d.doc)}"></label>
+    <label class="fld"><span>Teléfono</span><input class="in" id="nc-tel" value="${esc(d.tel)}"></label></div>
+    <div class="addrow" style="margin-top:14px"><button class="btn pri" type="submit">Guardar cliente</button><button class="btn" type="button" data-act="cancelc">Cancelar</button></div></form></section>`;
+  const i=$('#nc-nombre');if(i)i.focus();
+}
+function saveNewClient(){
+  const d=S.draftC;if(!(d.nombre||'').trim()){toast('Escribí el nombre del cliente');const i=$('#nc-nombre');if(i)i.focus();return}
+  const c={id:uid(),nombre:d.nombre.trim(),doc:(d.doc||'').trim(),tel:(d.tel||'').trim(),nota:'',creado:Date.now()};
+  S.clientes.push(c);queueSave('clientes',c);S.selC=c.id;S.selB=null;S.view='main';S.picking=true;S.q='';S.draftC={nombre:'',doc:'',tel:''};renderAll();toast('Cliente guardado');
+  setTimeout(()=>{const it=document.querySelector('.citem[aria-current="true"]');if(it&&it.scrollIntoView)it.scrollIntoView({block:'nearest'})},50);
+}
+function allRows(){
+  const q=S.aq.trim().toLowerCase();
+  return S.budgets.map(b=>({b,c:S.clientes.find(x=>x.id===b.clienteId)||{},k:calc(b,S.cfg)}))
+   .filter(r=>(!S.allArea||r.b.tipo===S.allArea)&&(!S.allEst||r.k.estado===S.allEst)&&(!q||[r.c.nombre,r.c.doc,r.b.concepto,'n° '+pad(r.b.nro),String(r.b.nro)].join(' ').toLowerCase().includes(q)))
+   .sort((x,y)=>(y.b.creado||0)-(x.b.creado||0)||(y.b.nro||0)-(x.b.nro||0));
+}
+function allBody(){
+  const q=S.aq.trim().toLowerCase();
+  if(S.allTab==='p'){
+    const rows=allRows(),tot=rows.reduce((a,r)=>({t:a.t+r.k.total,p:a.p+r.k.pagado,s:a.s+Math.max(0,r.k.saldo)}),{t:0,p:0,s:0});
+    return `<div class="asum"><span><b>${rows.length}</b> presupuesto${rows.length===1?'':'s'}</span><span>Total <b class="num">Gs. ${fmt(tot.t)}</b></span><span>Cobrado <b class="num">Gs. ${fmt(tot.p)}</b></span><span>Saldo pendiente <b class="num">Gs. ${fmt(tot.s)}</b></span></div>
+    <div class="twrap"><table class="atbl"><thead><tr><th>N°</th><th>Cliente</th><th>Concepto</th><th>Área</th><th>Fecha</th><th class="r">Total</th><th class="r">Pagado</th><th class="r">Saldo</th><th>Estado</th></tr></thead><tbody>${rows.map(r=>`<tr data-act="openb" data-id="${r.b.id}" ${r.b.id===S.hl?'class="hl"':''}><td class="num">${pad(r.b.nro)}</td><td><b>${esc(r.c.nombre||'Sin cliente')}</b></td><td>${esc(r.b.concepto||'')}</td><td>${r.b.tipo==='juicio'?'Judicial':'Escribanía'}</td><td>${esc(fechaCorta(r.b.fecha))}</td><td class="r num">${fmt(r.k.total)}</td><td class="r num">${fmt(r.k.pagado)}</td><td class="r num">${fmt(Math.max(0,r.k.saldo))}</td><td><span class="pill ${stateCls(r.k.estado)}">${r.k.estado}</span></td></tr>`).join('')||`<tr><td colspan="9" class="hint">No hay presupuestos que coincidan.</td></tr>`}</tbody></table></div>`;
+  }
+  const cl=sortedClients().filter(c=>!q||[c.nombre,c.doc,c.tel].join(' ').toLowerCase().includes(q));
+  return `<div class="asum"><span><b>${cl.length}</b> cliente${cl.length===1?'':'s'}</span></div>
+  <div class="twrap"><table class="atbl"><thead><tr><th>Cliente</th><th>C.I. / RUC</th><th>Teléfono</th><th class="r">Presupuestos</th><th class="r">Saldo pendiente</th></tr></thead><tbody>${cl.map(c=>{const bs=S.budgets.filter(b=>b.clienteId===c.id);const sd=bs.reduce((a,b)=>a+Math.max(0,calc(b,S.cfg).saldo),0);return `<tr data-act="openc" data-id="${c.id}"><td><b>${esc(c.nombre||'Sin nombre')}</b></td><td>${esc(c.doc||'')}</td><td>${esc(c.tel||'')}</td><td class="r num">${bs.length}</td><td class="r num">${sd?fmt(sd):'Al día'}</td></tr>`}).join('')||`<tr><td colspan="5" class="hint">No hay clientes que coincidan.</td></tr>`}</tbody></table></div>`;
+}
+function renderAllView(){
+  const m=$('#main');m.style.cssText='';
+  const chip=(act,key,val,txt,cur)=>`<button class="btn sm ${cur===val?'pri':''}" type="button" data-act="${act}" data-v="${val}">${txt}</button>`;
+  m.innerHTML=`<section class="card"><div class="card-h"><h3>Presupuestos y clientes</h3></div>
+   <div class="afil">${chip('allTab','',"p",'Presupuestos',S.allTab)}${chip('allTab','',"c",'Clientes',S.allTab)}
+   <input class="search" id="aq" type="search" placeholder="Buscar por cliente, C.I., concepto o N°" value="${esc(S.aq)}" aria-label="Buscar"></div>
+   ${S.allTab==='p'?`<div class="afil">${chip('allArea','','','Todas las áreas',S.allArea)}${chip('allArea','','escribania','Escribanía',S.allArea)}${chip('allArea','','juicio','Judicial',S.allArea)}<span style="width:10px"></span>${chip('allEst','','','Todos los estados',S.allEst)}${chip('allEst','','Pendiente','Pendiente',S.allEst)}${chip('allEst','','Parcial','Parcial',S.allEst)}${chip('allEst','','Pagado','Pagado',S.allEst)}</div>`:''}
+   <div id="abody">${allBody()}</div></section>`;
+}
 function renderMain(){
+  if(S.view==='all')return renderAllView();
+  if(S.view==='newc')return renderNewClient();
+  if(S.view==='newb')return renderNewBudget();
   const c=curC(),m=$('#main');
   if(!c){m.innerHTML=`<div class="card empty"><b>Elegí o creá un cliente</b>Cada cliente guarda sus presupuestos y lo que va pagando.<div style="margin-top:14px"><button class="btn pri" type="button" data-act="newc">＋ Nuevo cliente</button></div></div>`;return}
   const bs=budgetsOf(c.id),b=curB();
@@ -641,6 +721,7 @@ function budgetView(b){
   <div class="toolbar noprint">
     <div class="seg" role="group" aria-label="Vista"><button type="button" data-act="tab" data-t="edit" aria-pressed="${S.tab==='edit'}">Editar</button><button type="button" data-act="tab" data-t="doc" aria-pressed="${S.tab==='doc'}">Documento</button></div>
     <span class="sp"></span>
+    <button class="btn pri" type="button" data-act="savelist">Guardar y ver lista</button>
     <button class="btn" type="button" data-act="dup">Duplicar</button>
     <button class="btn danger ${S.arm==='delb'?'arm':''}" type="button" data-act="delb">${S.arm==='delb'?'Confirmar: eliminar':'Eliminar presupuesto'}</button>
   </div>
@@ -726,6 +807,7 @@ function pagoRow(p,i){
     <span class="unit"><input class="in num" inputmode="numeric" data-p="${i}" data-f="monto" data-t="money" value="${fmt(p.monto)}" aria-label="Monto pagado"><em>Gs.</em></span>
     <button class="x btn ghost sm" type="button" data-act="rmpago" data-i="${i}" aria-label="Quitar pago" style="border:0;font-size:19px;padding:0 4px">×</button>
     <input class="in nt" data-p="${i}" data-f="nota" data-t="text" value="${esc(p.nota||'')}" placeholder="Nota (recibo N°, quién pagó…)" aria-label="Nota">
+    <div class="cmp">${p.foto?`<img src="${p.foto}" alt="Comprobante" data-act="zoom" data-i="${i}"><button class="btn sm ghost" type="button" data-act="rmfoto" data-i="${i}">Quitar comprobante</button>`:''}<label class="btn sm">${p.foto?'Cambiar foto':'＋ Foto del comprobante'}<input type="file" accept="image/*" data-foto="${i}" hidden></label></div>
   </div>`;
 }
 function editorHTML(b){
@@ -1148,11 +1230,7 @@ function rerenderEditor(){
   const b=curB(),ed=$('#editor');if(!b||!ed)return;
   const y=window.scrollY;ed.innerHTML=editorHTML(b);refreshNumbers(true);window.scrollTo(0,y);
 }
-function addClient(){
-  const c={id:uid(),nombre:'',doc:'',tel:'',nota:'',creado:Date.now()};
-  S.clientes.push(c);S.selC=c.id;S.selB=null;S.view='main';S.picking=true;queueSave('clientes',c);renderAll();
-  const i=$('#c-nombre');if(i)i.focus();
-}
+function addClient(){S.draftC={nombre:'',doc:'',tel:''};S.view='newc';S.picking=false;renderAll()}
 function newBudget(tplId){
   const c=curC();if(!c)return;
   const b=makeBudget(tplId,S.cfg,{clienteId:c.id,nro:nextNro(),fecha:today(),creado:Date.now()});
@@ -1166,6 +1244,18 @@ document.addEventListener('click',e=>{
     case'area':{S.area=el.dataset.a;S.view='main';S.picking=false;const cs=sortedClients();const withB=cs.find(c=>budgetsOf(c.id).length);S.selC=(withB||cs[0]||{}).id||null;{const bs=S.selC?budgetsOf(S.selC):[];S.selB=bs.length?bs[bs.length-1].id:null}renderAll();window.scrollTo(0,0);break}
     case'selc':S.selC=el.dataset.id;S.view='main';S.picking=false;{const bs=budgetsOf(S.selC);S.selB=bs.length?bs[bs.length-1].id:null}renderAll();break;
     case'newc':addClient();break;
+    case'narea':S.draftB.area=el.dataset.v;S.draftB.tpl=(TEMPLATES.find(t=>t.tipo===el.dataset.v&&!/blanco/.test(t.id))||{}).id;renderNewBudget();break;
+    case'ntpl':S.draftB.tpl=el.dataset.id;renderNewBudget();break;
+    case'cancelb':S.draftB=null;S.view='main';renderAll();break;
+    case'savelist':S.hl=b?b.id:null;S.view='all';S.allTab='p';S.allArea='';S.allEst='';S.aq='';renderAll();window.scrollTo(0,0);toast('Presupuesto guardado');break;
+    case'cancelc':S.view='main';renderAll();break;
+    case'allTab':S.allTab=el.dataset.v;renderAllView();break;
+    case'allArea':S.allArea=el.dataset.v;renderAllView();break;
+    case'allEst':S.allEst=el.dataset.v;renderAllView();break;
+    case'openb':{const x=S.budgets.find(q=>q.id===el.dataset.id);if(!x)break;S.area=x.tipo;S.selC=x.clienteId;S.selB=x.id;S.view='main';S.picking=false;S.q='';renderAll();window.scrollTo(0,0);break}
+    case'openc':{const bs=S.budgets.filter(q=>q.clienteId===el.dataset.id).sort((x,y)=>(x.nro||0)-(y.nro||0));const last=bs[bs.length-1];S.area=last?last.tipo:(S.area||'escribania');S.selC=el.dataset.id;S.selB=last?last.id:null;S.view='main';S.picking=false;S.q='';renderAll();window.scrollTo(0,0);break}
+    case'zoom':{const pg=b&&b.pagos[+el.dataset.i];if(!pg||!pg.foto)break;const lb=document.createElement('div');lb.id='lightbox';lb.innerHTML=`<img alt="Comprobante" src="${pg.foto}">`;lb.addEventListener('click',()=>lb.remove());document.body.appendChild(lb);break}
+    case'rmfoto':{const pg=b&&b.pagos[+el.dataset.i];if(pg){delete pg.foto;saveBudget(b);rerenderEditor()}break}
     case'pick':S.picking=!S.picking;renderMain();break;
     case'newb':newBudget(el.dataset.id);break;
     case'selb':S.selB=el.dataset.id;S.picking=false;renderAll();break;
@@ -1209,6 +1299,24 @@ document.addEventListener('click',e=>{
 });
 $('#side').addEventListener('input',e=>{if(e.target.id==='q'){S.q=e.target.value;S._qfocus=true;renderSide();S._qfocus=false}});
 $('#btnHome').addEventListener('click',()=>{S.area=null;S.view='main';S.picking=false;S.arm='';renderAll();window.scrollTo(0,0)});
+$('#btnAll').addEventListener('click',()=>{S.view=S.view==='all'?'main':'all';S.picking=false;S.arm='';renderAll();window.scrollTo(0,0)});
+$('#main').addEventListener('input',e=>{
+  const t=e.target;
+  if(t.id==='aq'){S.aq=t.value;const ab=$('#abody');if(ab)ab.innerHTML=allBody()}
+  else if(t.id==='nb-nombre'&&S.draftB){S.draftB.nombre=t.value;const h=$('#nb-hint');if(h){const ex=S.clientes.find(c=>(c.nombre||'').trim().toLowerCase()===t.value.trim().toLowerCase()&&t.value.trim());h.textContent=ex?'Cliente existente: el presupuesto se agrega a su ficha.':(t.value.trim()?'Cliente nuevo: se crea al guardar.':'');if(ex){if(!S.draftB.doc&&ex.doc){S.draftB.doc=ex.doc;$('#nb-doc').value=ex.doc}if(!S.draftB.tel&&ex.tel){S.draftB.tel=ex.tel;$('#nb-tel').value=ex.tel}}}}
+  else if(t.id==='nb-doc'&&S.draftB)S.draftB.doc=t.value;else if(t.id==='nb-tel'&&S.draftB)S.draftB.tel=t.value;
+  else if(t.id==='nb-valor'&&S.draftB){liveMoney(t);S.draftB.valor=parseMoney(t.value)}
+  else if(t.id==='nc-nombre')S.draftC.nombre=t.value;else if(t.id==='nc-doc')S.draftC.doc=t.value;else if(t.id==='nc-tel')S.draftC.tel=t.value;
+});
+$('#main').addEventListener('submit',e=>{if(e.target.id==='nbform'){e.preventDefault();saveNewBudget((e.submitter&&e.submitter.value)||'list');return}
+  if(e.target.id==='ncform'){e.preventDefault();saveNewClient()}});
+function shrinkImg(file,max=1100,q=.72){return new Promise((ok,no)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{const r=Math.min(1,max/Math.max(im.width,im.height)),cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(im.width*r));cv.height=Math.max(1,Math.round(im.height*r));const x=cv.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,cv.width,cv.height);x.drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(u);ok(cv.toDataURL('image/jpeg',q))};im.onerror=()=>{URL.revokeObjectURL(u);no(new Error('img'))};im.src=u})}
+$('#main').addEventListener('change',async e=>{
+  const el=e.target;if(el.dataset.foto===undefined)return;
+  const b=curB(),pg=b&&b.pagos[+el.dataset.foto],f=el.files&&el.files[0];if(!pg||!f)return;
+  try{pg.foto=await shrinkImg(f);saveBudget(b);rerenderEditor();toast('Comprobante guardado')}catch(err){toast('No se pudo leer esa imagen. Probá con una foto JPG o PNG.')}
+});
+$('#btnNewB').addEventListener('click',()=>{S.draftB=freshDraftB();S.view='newb';S.picking=false;S.arm='';renderAll();window.scrollTo(0,0)});
 $('#btnCfg').addEventListener('click',()=>{S.view=S.view==='cfg'?'main':'cfg';renderAll();window.scrollTo(0,0)});
 window.SB_BOOT(init);
 </script>
