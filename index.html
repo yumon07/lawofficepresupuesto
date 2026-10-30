@@ -455,7 +455,7 @@ function makeBudget(tplId,cfg,extra){
   return Object.assign({
     id:uid(),clienteId:'',nro:1,tipo:t.tipo,plantilla:t.id,concepto:t.nombre,valor:0,fecha:'',jornal:cfgJornal(cfg),dist:'150',descOn:false,moneda:'PYG',tc:cfg.tc||6000,ret:{on:false,mode:'pct',val:cfg.pcts.ret},
     reembolso:mkLines(RE,t.re,ov,baseRe),gastos:mkLines(t.tipo==='juicio'?JGA:GA,t.ga,ov,baseGa),honorarios:mkLines(HO,t.ho,ov,baseHo),
-    descuento:{mode:'monto',val:0},sena:{mode:'pct',val:0},pagos:[],obs:'',hoja2:true,mostrarPagos:true,creado:0
+    descuento:{mode:'monto',val:0},sena:{mode:'pct',val:0},pagos:[],obs:'',hoja2:false,mostrarPagos:true,creado:0
   },extra||{});
 }
 /*ENGINE_END*/
