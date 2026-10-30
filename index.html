@@ -928,7 +928,7 @@ function sheetsHTML(b,c,cfg){
     <div><label>C.I. / RUC</label><span>${esc(c&&c.doc||'')||'&nbsp;'}</span></div>
     <div class="w"><label>Concepto</label><span>${esc(b.concepto)||'&nbsp;'}</span></div>
     ${b.valor?`<div class="w"><label>Valor</label><span class="num">${esc(valTxt(b))}</span></div>`:''}
-    <div class="w"><label>Condiciones</label><span>${esc(cond.join(' · '))}</span></div></div>`;
+    </div>`;
   let pg='';
   if(b.mostrarPagos&&b.pagos.length){
     pg=`<div class="sh-box"><h4>Pagos recibidos</h4><table class="sh-tbl"><tbody>${b.pagos.map(p=>`<tr><td>${esc(fechaCorta(p.fecha))}</td><td>${esc(p.concepto)}${p.forma?' · '+esc(p.forma):''}${p.nota?` <span class="mu">${esc(p.nota)}</span>`:''}</td><td class="n">${fmt(p.monto)}</td></tr>`).join('')}</tbody></table></div>`;
@@ -1033,7 +1033,7 @@ async function exportXLSX(){
     if(!window.XLSX)throw new Error('lib');
     const k=calc(b,S.cfg),j=jornalOf(b,S.cfg),m=S.cfg.membrete;
     const a=[[b.tipo==='juicio'?m.juicio:m.escribania,'','',`PRESUPUESTO N° ${pad(b.nro)}`],[ 'Digital Law Office','','',fechaTxt(b.fecha)],[],
-      ['CLIENTE:',c&&c.nombre||'','C.I./RUC:',c&&c.doc||''],['CONCEPTO:',b.concepto],['CONDICIONES:',(descActive(b)?'Con descuento':'Sin descuento')+' · '+(b.dist==='mas'?'Más de 150 km':'Hasta 150 km')],['VALOR (Gs.):',valorGs(b)],...(b.moneda==='USD'?[['VALOR EN USD:',b.valor||0],['CAMBIO (Gs. POR USD):',b.tc||0]]:[]),[],
+      ['CLIENTE:',c&&c.nombre||'','C.I./RUC:',c&&c.doc||''],['CONCEPTO:',b.concepto],['VALOR (Gs.):',valorGs(b)],...(b.moneda==='USD'?[['VALOR EN USD:',b.valor||0],['CAMBIO (Gs. POR USD):',b.tc||0]]:[]),[],
       ['1) REEMBOLSO DE IMPUESTOS / TASAS Y GASTOS','Imp./Tasas/Gastos','Servicios I.V.A. 10%']];
     k.reemAll.forEach(r=>a.push([r.on?lineLabel(r.l):r.l.label,r.on?r.amt:'–','']));a.push(['TOTAL',k.tReem,'']);
     a.push(['2) GASTOS','','']);k.gasAll.forEach(r=>a.push([r.on?lineLabel(r.l):r.l.label,'',r.on?r.amt:'–']));
